@@ -1,5 +1,5 @@
 {
-  "name": "http-api-assignment-ii",
+  "name": "project1",
   "version": "1.0.0",
   "description": "homework assignment",
   "main": "./src/server.js",
@@ -11,14 +11,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/ryankohn1357/http-api-assignment-ii.git"
+    "url": "git+https://github.com/ryankohn1357/project1.git"
   },
   "author": "Ryan Kohn",
   "license": "UNLICENSED",
   "bugs": {
-    "url": "https://github.com/ryankohn1357/http-api-assignment-ii/issues"
+    "url": "https://github.com/ryankohn1357/project1/issues"
   },
-  "homepage": "https://github.com/ryankohn1357/http-api-assignment-ii#readme",
+  "homepage": "https://github.com/ryankohn1357/project1#readme",
   "devDependencies": {
     "eslint": "^6.4.0",
     "eslint-config-airbnb": "^18.0.1",

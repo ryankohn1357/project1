@@ -1,5 +1,5 @@
-const users = {};
-let numUsers = 0;
+const trivia = require('./trivia.js');
+const admin = require('./admin.js');
 
 // send a JSON response
 const respondJSON = (request, response, status, object) => {
@@ -8,66 +8,144 @@ const respondJSON = (request, response, status, object) => {
   response.end();
 };
 
-// send a JSON head response
-const respondJSONMeta = (request, response, status) => {
-  response.writeHead(status, { 'Content-Type': 'application/json' });
-  response.end();
-};
-
-// send JSON object with users and a successful error code 
-const getUsers = (request, response) => {
+const randomTrivia = (request, response, params) => {
+  let triviaToReturn;
+  if (!params.tag) {
+    triviaToReturn = trivia.getRandomTrivia();
+  } else {
+    triviaToReturn = trivia.getRandomTrivia(params.tag);
+  }
   const responseJSON = {
-    users,
+    triviaToReturn,
   };
   return respondJSON(request, response, 200, responseJSON);
 };
 
-// send successful error code
-const getUsersMeta = (request, response) => respondJSONMeta(request, response, 200);
-
-// send a 404 not found error code and message/id
-const notReal = (request, response) => {
+const browseTrivia = (request, response, params) => {
+  let tag = 'unknown';
+  let amount = 10;
+  let offset = 0;
+  if (params.tag) {
+    tag = params.tag;
+  }
+  if (params.amount) {
+    amount = params.amount;
+  }
+  if (params.offset) {
+    offset = params.offset;
+  }
+  const triviaToReturn = trivia.getTriviaByTag(tag, amount, offset);
   const responseJSON = {
-    message: 'The page you are looking for was not found.',
-    id: 'notFound',
+    triviaToReturn,
   };
-  return respondJSON(request, response, 404, responseJSON);
+  return respondJSON(request, response, 200, responseJSON);
 };
 
-// send a 404 not found error code with no message/id
-const notRealMeta = (request, response) => respondJSONMeta(request, response, 404);
-
-// add a user with a given age/name
-const addUser = (request, response, params) => {
+const addTrivia = (request, response, params) => {
   const responseJSON = { // default message
     message: 'Created Successfully',
   };
   // if a required parameter is missing, send a 400 bad request error with message/id
-  if (!params.age || !params.name) {
-    responseJSON.message = 'Name and age are both required.';
+  if (!params.params.content || !params.source || !params.date) {
+    responseJSON.message = 'Trivia content, source, and creation date are all required.';
     responseJSON.id = 'badRequest';
     return respondJSON(request, response, 400, responseJSON);
   }
-  // if the user with a given name exists, update it and return 204 updated error code
-  for (let i = 0; i < numUsers; i++) {
-    const key = `user${String(i + 1)}`;
-    if (users[key] && users[key].name === params.name) {
-      users[key].age = params.age;
-      return respondJSONMeta(request, response, 204);
-    }
+
+  if (params.tag) {
+    trivia.addTrivia(params.content, params.source, params.date, params.tag);
+  } else {
+    trivia.addTrivia(params.content, params.source, params.date);
   }
-  // otherwise, add user to users and return 201 created code with default message
-  const key = `user${String(numUsers + 1)}`;
-  const newUser = { name: params.name, age: params.age };
-  users[key] = newUser;
-  numUsers++;
   return respondJSON(request, response, 201, responseJSON);
 };
 
+const getProblemReports = (request, response) => {
+  const problemReports = admin.getProblemReports();
+  const responseJSON = {
+    problemReports,
+  };
+  return respondJSON(request, response, 200, responseJSON);
+};
+
+const createProblemReport = (request, response, params) => {
+  const responseJSON = {
+    message: 'Created Successfully',
+  };
+  if (!params.message) {
+    responseJSON.message = 'Missing message parameter for problem report.';
+    respondJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  admin.createProblemReport(params.message);
+  return respondJSON(request, response, 201, responseJSON);
+};
+
+const resolveProblemReport = (request, response, params) => {
+  const responseJSON = {
+    message: 'Problem Report Resolved',
+  };
+  if (!params.index) {
+    responseJSON.message = 'Missing index parameter for problem report.';
+    responseJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  const status = admin.resolveProblemReport(params.index);
+  if (status === -1) {
+    responseJSON.message = 'Index parameter out of range for problem report.';
+    responseJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  return respondJSON(request, response, 200, responseJSON);
+};
+
+const getSuggestedTrivia = (request, response) => {
+  const suggestedTrivia = admin.getSuggestedTrivia();
+  const responseJSON = {
+    suggestedTrivia,
+  };
+  return respondJSON(request, response, 200, responseJSON);
+};
+
+const suggestTrivia = (request, response, params) => {
+  const responseJSON = {
+    message: 'Suggestion Sent',
+  };
+  if (!params.source) {
+    responseJSON.message = 'Missing source parameter for trivia suggestion.';
+    respondJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  admin.suggestTrivia(params.source);
+  return respondJSON(request, response, 201, responseJSON);
+};
+
+const resolveSuggestedTrivia = (request, response, params) => {
+  const responseJSON = {
+    message: 'Suggested Trivia Resolved',
+  };
+  if (!params.index) {
+    responseJSON.message = 'Missing index parameter for suggested trivia.';
+    responseJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  const status = admin.resolveSuggestedTrivia(params.index);
+  if (status === -1) {
+    responseJSON.message = 'Index parameter out of range for suggested trivia.';
+    responseJSON.id = 'badRequest';
+    return respondJSON(request, response, 400, responseJSON);
+  }
+  return respondJSON(request, response, 200, responseJSON);
+};
+
 module.exports = {
-  getUsers,
-  getUsersMeta,
-  notReal,
-  notRealMeta,
-  addUser,
+  randomTrivia,
+  browseTrivia,
+  addTrivia,
+  getProblemReports,
+  createProblemReport,
+  resolveProblemReport,
+  getSuggestedTrivia,
+  suggestTrivia,
+  resolveSuggestedTrivia,
 };

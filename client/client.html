@@ -2,88 +2,57 @@
 <html lang="en">
 
 <head>
-  <title>Our simple HTTP server</title>
+  <title>MTG Design Trivia</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
   <script type="text/babel">
 
     // update content based on response
-    const handleResponse = (xhr, parseResponse) => {
+    const displayTrivia = (xhr) => {
       const content = document.querySelector("#content");
-      switch(xhr.status) {
-        case 200:
-          content.innerHTML = `<b>Success</b>`;
-          break;
-        case 201: // if created
-          content.innerHTML = '<b>Create</b>';
-          break;
-        case 204: // if updated
-          content.innerHTML = '<b>Updated (No Content)</b>';
-          return; // no content to parse, so just return
-        case 400: // if bad request
-          content.innerHTML = `<b>Bad Request</b>`;
-          break;
-        case 404: // if not found
-          content.innerHTML = `<b>Resource Not Found</b>`;
-          break;
-        default: // any other status
-          content.innerHTML = `Error code not implemented by client.`;
-          break;
-      }    
-      if(parseResponse) {
-        // parse the object and add it to content
-        const obj = JSON.parse(xhr.response);
-        if(obj.message) { 
-          content.innerHTML = `${content.innerHTML} <p>Message: ${obj.message}</p>`;
-        }
-        else { // if there's no message, then it'll be an object containing all users, which we want to print raw
-          content.innerHTML = `${content.innerHTML} <p>${xhr.response}`;
-        }
+      content.innerHTML = "";
+      const obj = JSON.parse(xhr.response);
+      const trivia = obj.triviaToReturn;
+      console.dir(trivia);
+      for(let i = 0; i < trivia.length; i++) {
+        content.innerHTML = `${content.innerHTML} <p>${trivia[i].contents}</p>`;
       }
     };
 
-    // send a post request to the server to add/update a user
-    const sendPost = (e, nameForm) => {
-      const nameAction = nameForm.getAttribute('action');
-      const nameMethod = nameForm.getAttribute('method');
-      const nameField = nameForm.querySelector('#nameField');
-      const ageField = nameForm.querySelector('#ageField');
+    const getTrivia = (e, url, queryParams='') => {
       const xhr = new XMLHttpRequest();
-      xhr.open(nameMethod, nameAction);
+      console.dir(queryParams);
+      xhr.open('get', `${url}?${queryParams}`);
       xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       xhr.setRequestHeader('Accept', 'application/json');
-      xhr.onload = () => handleResponse(xhr, true);
-      const formData = `name=${nameField.value}&age=${ageField.value}`;
-      xhr.send(formData);
-      e.preventDefault(); // prevent page redirection
-      return false;
-    };
-
-    // send either a head or get request to the server
-    const requestUpdate = (e, userForm) => {
-      const url = userForm.querySelector('#urlField').value;
-      const method = userForm.querySelector('#methodSelect').value;
-      const xhr = new XMLHttpRequest();
-      xhr.open(method, url);
-      xhr.setRequestHeader('Accept', 'application/json');
-      xhr.onload = () => handleResponse(xhr, method == 'get');
+      xhr.onload = () => displayTrivia(xhr);
       xhr.send();
       // prevent page redirection
       e.preventDefault();
       return false;
-    }
+    };
 
     // set up button events
     const init = () => {
-      const nameForm = document.querySelector("#nameForm");
-      const userForm = document.querySelector("#userForm");
+      const randTriviaForm = document.querySelector("#randomTriviaForm");
+      const browseTriviaForm = document.querySelector("#browseTriviaForm");
+      const randTriviaButton = document.querySelector("#randomTriviaButton");
 
-      const addUser = (e) => sendPost(e, nameForm);
-      const getUpdate = (e) => requestUpdate(e, userForm); 
+      const untaggedRandTrivia = (e) => getTrivia(e, '/randomTrivia');
+      const taggedRandTrivia = (e) => {
+        let tag = randTriviaForm.querySelector("#randomTagSelect").value;
+        getTrivia(e, '/randomTrivia', `tag=${tag}`);
+      }; 
+      const browseTrivia = (e) => {
+        let tag = browseTriviaForm.querySelector("#browseTagSelect").value;
+        let numResults = browseTriviaForm.querySelector("#numResultsSelect").value;
+        getTrivia(e, '/browseTrivia', `tag=${tag}&amount=${numResults}`);
+      };
 
-      nameForm.addEventListener('submit', addUser);
-      userForm.addEventListener('submit', getUpdate);
+      randTriviaForm.addEventListener('submit', taggedRandTrivia);
+      randTriviaButton.addEventListener('click', untaggedRandTrivia);
+      browseTriviaForm.addEventListener('submit', browseTrivia);
     }
 
     window.onload = init;
@@ -92,28 +61,35 @@
 
 <body>
   <section id="top">
-    <h3>POST Status Code Tests</h3>
-    <form id="nameForm" action="/addUser" method="post">
-      <label for="name">Name: </label>
-      <input id="nameField" type="text" name="name" />
-      <label for="age">Age: </label>
-      <input id="ageField" type="number" name="age" min="0" max="100" step="1" />
-      <input type="submit" value="Add User" />
+    <h3>Get MTG Design Trivia!</h3>
+    <button id="randomTriviaButton">Get Random Trivia</button> 
+    <form id="randomTriviaForm">
+      <input type="submit" value="Get Random Trivia with Tag" />
+      <select id="randomTagSelect">
+        <option value="General">General</option>
+        <option value="Design">Design</option>
+        <option value="Story">Story</option>
+        <option value="Random">Any</option>
+      </select>      
     </form>
-    <form id="userForm" action="/getUsers" method="get">
-      <select id='urlField'>
-        <option value='/getUsers'>/getUsers</option>
-        <option value='/notReal'>/notReal</option>
-      </select>
-      <select id="methodSelect">
-        <option value="get">GET</option>
-        <option value="head">HEAD</option>
-      </select>
-      <input type="submit" value="Get User" />
+    <form id="browseTriviaForm">
+      <input type="submit" value="Browse Trivia" />
+      <select id="browseTagSelect">
+        <option value="General">General</option>
+        <option value="Design">Design</option>
+        <option value="Story">Story</option>
+      </select>    
+      <select id="numResultsSelect">
+        <option value="1">1</option>
+        <option value="5">5</option>
+        <option value="10">10</option>
+      </select>    
     </form>
   </section>
   <section id="content">
   </section>
+  <br>
+  <p>TO DO: Allow user to create problem reports and suggest trivia.</p>
 </body>
 
 </html>
