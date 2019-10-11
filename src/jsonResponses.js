@@ -27,7 +27,7 @@ const randomTrivia = (request, response) => {
   return respondJSON(request, response, 200, responseJSON);
 };
 
-// returns a JSON object with an array of trivia 
+// returns a JSON object with an array of trivia
 const browseTrivia = (request, response, params) => {
   // defaults
   let amount = 5;

@@ -22,9 +22,10 @@ const getNotFound = (request, response) => {
   response.end();
 };
 
-// returns the admin page where admins can add/remove trivia, respond to problem reports and suggestions
+// returns the admin page where admins can add/remove trivia,
+// respond to problem reports and suggestions
 const getAdmin = (request, response) => {
-  response.writeHead(404, { 'Content-Type': 'text/html' });
+  response.writeHead(200, { 'Content-Type': 'text/html' });
   response.write(admin);
   response.end();
 };

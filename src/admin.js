@@ -3,10 +3,10 @@ const problemReports = []; // object with both message and source of trivia with
 const suggestedTrivia = []; // just messages
 
 // returns all problem reports
-const getProblemReports = () => { return problemReports; };
+const getProblemReports = () => problemReports;
 
 // returns all suggested trivia
-const getSuggestedTrivia = () => { return suggestedTrivia; };
+const getSuggestedTrivia = () => suggestedTrivia;
 
 // adds a new problem report object if the required parameters are there
 const createProblemReport = (problemReport) => {
@@ -21,7 +21,8 @@ const suggestTrivia = (content) => {
 };
 
 // sets a problem report with the given index to null
-// we do this instead of removing it from array in order to not mess with indexes for future resolutions
+// we do this instead of removing it from array in order
+// to not mess with indexes for future resolutions
 const resolveProblemReport = (index) => {
   if (index < problemReports.length && index >= 0) {
     delete problemReports[index];
@@ -31,7 +32,8 @@ const resolveProblemReport = (index) => {
 };
 
 // sets a suggested trivia with the given index to null
-// we do this instead of removing it from array in order to not mess with indexes for future resolutions
+// we do this instead of removing it from array in order
+// to not mess with indexes for future resolutions
 const resolveSuggestedTrivia = (index) => {
   if (index < suggestTrivia.length && index >= 0) {
     delete suggestedTrivia[index];
