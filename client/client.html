@@ -4,55 +4,182 @@
 <head>
   <title>MTG Design Trivia</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
-
+  <link href="https://fonts.googleapis.com/css?family=Grenze&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
   <script type="text/babel">
+    let triviaAmount = 0; // keep track of the amount of trivia available for page switching when browsing
 
-    // update content based on response
-    const displayTrivia = (xhr) => {
-      const content = document.querySelector("#content");
-      content.innerHTML = "";
+    // handle a response sent by the server
+    const handleResponse = (xhr) => {
       const obj = JSON.parse(xhr.response);
-      const trivia = obj.triviaToReturn;
-      console.dir(trivia);
-      for(let i = 0; i < trivia.length; i++) {
-        content.innerHTML = `${content.innerHTML} <p>${trivia[i].contents}</p>`;
+      if(obj.triviaToReturn) {
+        displayTrivia(obj.triviaToReturn);
+      }
+      else if(obj.message && obj.message === 'Suggestion Sent') {
+        const options = document.querySelector("#options");
+        options.innerHTML = `${options.innerHTML} <p id="status">Suggestion Sent</p>`;
+      }
+      else if(obj.triviaAmount) {
+        triviaAmount = obj.triviaAmount;
       }
     };
 
-    const getTrivia = (e, url, queryParams='') => {
+    // take all the trivia in the array and format/display it in the content section
+    const displayTrivia = (trivia) => {
+      const content = document.querySelector("#content");
+      content.innerHTML = "";
+      for(let i = 0; i < trivia.length; i++) {
+        content.innerHTML = `${content.innerHTML} <div class="trivia"><p>${trivia[i].contents}<br><br>` +
+        `<div class="triviaNotes"><img class="problemReportImage" id="trivia${i}" src="/reportProblemImage.png"` +
+        `title="Report a Problem with this Trivia"></img>` +
+        `<a href='${trivia[i].source}'>Source</a></div></p></div>`;
+      }
+      // set up event handler for clicking on problem report icon
+      let problemReportImages = content.querySelectorAll("img");
+      for(let i = 0; i< problemReportImages.length; i++) {
+        problemReportImages[i].addEventListener('click', (e) => {
+          e.target.src = "/problemReportedImage.png";
+          const triviaSource = e.target.parentNode.querySelector("a").href;
+          let problem = prompt("What is the problem with this trivia?");
+          postRequest('/createProblemReport', {message: problem, source: triviaSource});
+        });
+      }
+    };
+
+    // send a post request to the server with the given url with an object containing what information you want to send server
+    const postRequest = (url, obj) => {
       const xhr = new XMLHttpRequest();
-      console.dir(queryParams);
-      xhr.open('get', `${url}?${queryParams}`);
+      xhr.open('post', url);
       xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
       xhr.setRequestHeader('Accept', 'application/json');
-      xhr.onload = () => displayTrivia(xhr);
-      xhr.send();
+      xhr.onload = () => handleResponse(xhr);
+      // turn obj into a string that the server will take
+      let formData = "";
+      const keys = Object.keys(obj);
+      for(let i = 0; i < keys.length; i++){
+        if(i == 0) {
+          formData = `${keys[i]}=${obj[keys[i]]}`;
+        }
+        else {
+          formData = `${formData}&${keys[i]}=${obj[keys[i]]}`;
+        }
+      }
+      xhr.send(formData);
       // prevent page redirection
-      e.preventDefault();
       return false;
     };
 
-    // set up button events
-    const init = () => {
-      const randTriviaForm = document.querySelector("#randomTriviaForm");
-      const browseTriviaForm = document.querySelector("#browseTriviaForm");
-      const randTriviaButton = document.querySelector("#randomTriviaButton");
+    // send a get request to the server with the given url and query parameters
+    const getRequest = (url, queryParams='') => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('get', `${url}?${queryParams}`);
+      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.onload = () => handleResponse(xhr);
+      xhr.send();
+      // prevent page redirection
+      return false;
+    };
 
-      const untaggedRandTrivia = (e) => getTrivia(e, '/randomTrivia');
-      const taggedRandTrivia = (e) => {
-        let tag = randTriviaForm.querySelector("#randomTagSelect").value;
-        getTrivia(e, '/randomTrivia', `tag=${tag}`);
-      }; 
-      const browseTrivia = (e) => {
-        let tag = browseTriviaForm.querySelector("#browseTagSelect").value;
-        let numResults = browseTriviaForm.querySelector("#numResultsSelect").value;
-        getTrivia(e, '/browseTrivia', `tag=${tag}&amount=${numResults}`);
+    let page = 0; // keep track of what page we're on when browsing trivia
+
+    // setup all tabs and associated event handlers
+    const init = () => {
+      getRequest('/triviaAmount'); // save the amount of trivia available so we know when we've reached the max page
+
+      // get references to all tabs
+      const randTriviaTab = document.querySelector("#randomTriviaTab");
+      const browseTriviaTab = document.querySelector("#browseTriviaTab");
+      const chooseTagTab = document.querySelector("#chooseTagTab");
+
+      // methods for event handling
+      const randTrivia = (e) => getRequest('/randomTrivia');
+      const browseTrivia = (e, resultsPerPage) => {
+        getRequest('/browseTrivia', `offset=${page*resultsPerPage}&amount=${resultsPerPage}`);
       };
 
-      randTriviaForm.addEventListener('submit', taggedRandTrivia);
-      randTriviaButton.addEventListener('click', untaggedRandTrivia);
-      browseTriviaForm.addEventListener('submit', browseTrivia);
+      // called when a tab is selected
+      const selectTab = (e) => {
+        const options = document.querySelector("#options");
+        const content = document.querySelector("#content");
+        const randTriviaTab = document.querySelector("#randomTriviaTab");
+        const browseTriviaTab = document.querySelector("#browseTriviaTab");
+        const suggestTriviaTab = document.querySelector("#suggestTriviaTab");
+        const tabs = [randTriviaTab, browseTriviaTab, suggestTriviaTab];
+        content.innerHTML = "";
+        // make coloring different for active tab
+        for(let i = 0; i < tabs.length; i++) {
+          if(tabs[i].id == e.target.id) {
+            tabs[i].style.color = "black";
+            tabs[i].style.background = "red";
+          }
+          else {
+            tabs[i].style.color = "lightcoral";
+            tabs[i].style.background = "#632149";
+          }
+        }
+        // create content and event handling for the clicked on tab
+        if(e.target.id == "randomTriviaTab") {
+          options.innerHTML = `<button id="randomTriviaButton">Get Another Random Trivia</button>`
+          const randTriviaButton = options.querySelector("#randomTriviaButton");
+          randTriviaButton.addEventListener('click', randTrivia);
+          randTrivia();
+        }
+        else if(e.target.id == "browseTriviaTab") {
+          options.innerHTML = "<button id='prevPageButton'>Previous Page</button>" +
+          "<button id='nextPageButton'>Next Page</button><label>Results Per Page: </label><select>" + 
+          "<option value=1>1</option><option value=5 selected>5</option><option value=10>10</option>";
+          const nextPageButton = options.querySelector("#nextPageButton");
+          const prevPageButton = options.querySelector("#prevPageButton");
+          const resultsPerPageSelect = options.querySelector('select');
+          page = 0; // always start at page 0 when tab is selected
+          prevPageButton.disabled = true; // disable prev page button when page is 0
+          resultsPerPageSelect.addEventListener('change', (e) => {
+            browseTrivia(e, e.target.value);
+          });
+          nextPageButton.addEventListener('click', (e) => {
+            // disable next page button if the page we're moving to is the last one
+            if(triviaAmount < (page + 2) * resultsPerPageSelect.value) {
+              e.target.disabled = true;
+            }
+            // move to the next page if this isn't the last one
+            if(triviaAmount >= (page + 1) * resultsPerPageSelect.value) {
+              page++;
+            }
+            // enable prev page button if the page is not 0
+            if(page > 0){
+              prevPageButton.disabled = false;
+            }
+            browseTrivia(e, resultsPerPageSelect.value);
+          });
+          prevPageButton.addEventListener('click', (e) => {
+            // disable the prev page button if the page we're moving to is the first one
+            if(page <= 1) {
+              e.target.disabled = true;
+            }
+            // if we're going back a page, there will always be a next page
+            nextPageButton.disabled = false;
+            page = Math.max(0, page - 1);
+            browseTrivia(e, resultsPerPageSelect.value);
+          });
+          // immediately get results when tab is opened
+          browseTrivia(e, resultsPerPageSelect.value);
+        }
+        else if(e.target.id == "suggestTriviaTab") {
+          options.innerHTML = "<textarea id='sourceInput' placeholder='What new trivia should we add?" + 
+          " Please remember to provide a source for the trivia.' rows='5' cols='50'></textarea><br><br>" 
+          + "<button id='submitSuggestionButton'>Submit</button>";
+          const submitSuggestionButton = options.querySelector("#submitSuggestionButton");
+          submitSuggestionButton.addEventListener('click', (e) => {
+            let message = document.querySelector("#sourceInput").value;
+            postRequest('/suggestTrivia', {content: message});
+          });
+        }
+      };
+
+      suggestTriviaTab.addEventListener('click', selectTab);
+      randTriviaTab.addEventListener('click', selectTab);
+      browseTriviaTab.addEventListener('click', selectTab);
     }
 
     window.onload = init;
@@ -61,35 +188,19 @@
 
 <body>
   <section id="top">
-    <h3>Get MTG Design Trivia!</h3>
-    <button id="randomTriviaButton">Get Random Trivia</button> 
-    <form id="randomTriviaForm">
-      <input type="submit" value="Get Random Trivia with Tag" />
-      <select id="randomTagSelect">
-        <option value="General">General</option>
-        <option value="Design">Design</option>
-        <option value="Story">Story</option>
-        <option value="Random">Any</option>
-      </select>      
-    </form>
-    <form id="browseTriviaForm">
-      <input type="submit" value="Browse Trivia" />
-      <select id="browseTagSelect">
-        <option value="General">General</option>
-        <option value="Design">Design</option>
-        <option value="Story">Story</option>
-      </select>    
-      <select id="numResultsSelect">
-        <option value="1">1</option>
-        <option value="5">5</option>
-        <option value="10">10</option>
-      </select>    
-    </form>
+    <h1>Magic the Gathering Trivia</h1>
+    <h3>--<br>A compilation of interesting trivia compiled from posts by Mark Rosewater, the head designer of MTG</h3>
+    <div id="navContainer">
+      <ul id="navList">
+        <li id="randomTriviaTab">Get Random Trivia</li>
+        <li id="browseTriviaTab">Browse Trivia</li>
+        <li id="suggestTriviaTab">Suggest New Trivia</li>
+      </ul>
+    </div>
+    <div id="options"></div>
   </section>
   <section id="content">
   </section>
-  <br>
-  <p>TO DO: Allow user to create problem reports and suggest trivia.</p>
 </body>
 
 </html>

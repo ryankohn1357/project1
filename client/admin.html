@@ -1,23 +1,181 @@
 <!DOCTYPE html>
 <html lang="en">
-
 <head>
   <title>Admin</title>
   <link rel="stylesheet" type="text/css" href="/style.css">
-
+  <link href="https://fonts.googleapis.com/css?family=Grenze&display=swap" rel="stylesheet">
   <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-core/5.8.34/browser.min.js"></script>
   <script type="text/babel">
+    // handle a response sent by the server
+    const handleResponse = (xhr) => {
+      const obj = JSON.parse(xhr.response);
+      const content = document.querySelector("#content");
+      // format/display problem reports or suggested trivia
+      if(obj.problemReports || obj.suggestedTrivia) {
+        content.innerHTML = "";
+        const itemsToConsider = obj.problemReports || obj.suggestedTrivia;
+        for(let i = 0; i < itemsToConsider.length; i++) {
+          if(itemsToConsider[i]) // don't display null problem reports/suggested trivia
+          {
+            let contentString = `${itemsToConsider[i]}`;
+            if(obj.problemReports) {
+              contentString = `${itemsToConsider[i].message}<br>--<br><a href='${itemsToConsider[i].source}'>` + 
+                `${itemsToConsider[i].source}</a>`;
+            }
+            content.innerHTML = `${content.innerHTML} <div class="item">` +
+            `<p>${contentString}</p><p class="remove" id=item-${i}>Remove</p></div>`;
+          }
+        }
+        // handle case of no problem reports/suggested trivia
+        const divs = document.querySelectorAll(".item");
+        if(divs.length == 0) {
+          content.innerHTML = `<div class="item"><p>Nothing to Report</p></div>`;
+        }
+        // setup event handlers for paragraphs to remove the problem report/suggested trivia when clicked on
+        for(let i = 0; i < divs.length; i++) {
+          const removeParagraph = divs[i].querySelector(".remove");
+          if(obj.problemReports) {
+            removeParagraph.addEventListener('click', (e) => {
+              const id = Number(e.target.id.split('-')[1]);
+              postRequest('/resolveProblemReport', {index: id});
+              e.target.parentNode.remove();
+              const content = document.querySelector("#content");
+              const divs = document.querySelectorAll(".item");
+              if(divs.length == 0) { // if the problem report removed was the last one, display message again
+                content.innerHTML = `<div class="item"><p>Nothing to Report</p></div>`;
+              }
+            });
+          }
+          else {
+            removeParagraph.addEventListener('click', (e) => {
+              const id = Number(e.target.id.split('-')[1]);
+              postRequest('/resolveSuggestedTrivia', {index: id});
+              e.target.parentNode.remove();
+              const content = document.querySelector("#content");
+              const divs = document.querySelectorAll(".item");
+              if(divs.length == 0) { // if the suggested trivia removed was the last one, display message again
+                content.innerHTML = `<div class="item"><p>Nothing to Report</p></div>`;
+              }
+            });
+          }
+        }
+      }
+    };
+
+    // send a post request to the server with the given url with an object containing what information you want to send server
+    const postRequest = (url, obj) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('post', url);
+      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.onload = () => handleResponse(xhr);
+      let formData = "";
+      const keys = Object.keys(obj);
+      for(let i = 0; i < keys.length; i++){
+        if(i == 0) {
+          formData = `${keys[i]}=${obj[keys[i]]}`;
+        }
+        else {
+          formData = `${formData}&${keys[i]}=${obj[keys[i]]}`;
+        }
+      }
+      xhr.send(formData);
+      // prevent page redirection
+      return false;
+    };
+
+    // send a get request to the server with the given url and query parameters
+    const getRequest = (url, queryParams='') => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('get', `${url}?${queryParams}`);
+      xhr.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+      xhr.setRequestHeader('Accept', 'application/json');
+      xhr.onload = () => handleResponse(xhr);
+      xhr.send();
+      // prevent page redirection
+      return false;
+    };
+
+    // setup all tabs and associated event handlers
+    const init = () => {
+      const suggestedTriviaTab = document.querySelector("#suggestedTriviaTab");
+      const problemReportTab = document.querySelector("#problemReportTab");
+
+      // called when a tab is selected
+      const selectTab = (e) => {
+        const content = document.querySelector("#content");
+        const suggestedTriviaTab = document.querySelector("#suggestedTriviaTab");
+        const problemReportTab = document.querySelector("#problemReportTab");
+        const triviaChangeTab = document.querySelector("#triviaChangeTab");
+        const tabs = [problemReportTab, suggestedTriviaTab, triviaChangeTab];
+        content.innerHTML = "";
+        // change coloring for selected tab
+        for(let i = 0; i < tabs.length; i++) {
+          if(tabs[i].id == e.target.id) {
+            tabs[i].style.color = "black";
+            tabs[i].style.background = "red";
+          }
+          else {
+            tabs[i].style.color = "lightcoral";
+            tabs[i].style.background = "#632149";
+          }
+        }
+        if(e.target.id == "suggestedTriviaTab") {
+          getRequest('/suggestedTrivia');
+        }
+        else if(e.target.id == "problemReportTab") {
+          getRequest('/problemReports');
+        }
+        else if(e.target.id == 'triviaChangeTab'){
+          content.innerHTML = `<div class="changeTriviaDiv"><h4>Add Trivia</h4><div class="inputRow"><label>Content: </label>` +
+            `<input id="triviaContentInput"></input></div><div class="inputRow"><label>Source: </label><input id="triviaSourceInput">` +
+            `</input></div><div class="inputRow"><label>Date Source was Posted: </label><input id="triviaDateInput"` +
+             `placeholder="MM/DD/YYYY"></input></div><button id="addTriviaButton" class="changeTriviaButton">Submit</button>` + 
+             `<p id="addTriviaStatus"></p></div>`;
+          content.innerHTML += `<br><br><div class="changeTriviaDiv"><h4>Remove Trivia</h4><div class="inputRow"><label>Source: </label>` +
+            `<input id="sourceToRemoveInput"></input></div><button id="removeTriviaButton" class="changeTriviaButton">Submit</button>` + 
+             `<p id="removeTriviaStatus"></p></div>`;      
+          const addTriviaButton = content.querySelector("#addTriviaButton");
+          const removeTriviaButton = content.querySelector("#removeTriviaButton");
+          addTriviaButton.addEventListener('click', (e) => {
+            const newTriviaContent = document.querySelector("#triviaContentInput").value;
+            const newTriviaSource = document.querySelector("#triviaSourceInput").value;
+            const newTriviaDate = document.querySelector("#triviaDateInput").value;
+            postRequest('/addTrivia', {content: newTriviaContent, source: newTriviaSource, date: newTriviaDate});
+            document.querySelector("#addTriviaStatus").innerHTML = "Submitted";
+          });    
+          removeTriviaButton.addEventListener('click', (e) => {
+            const triviaSource = document.querySelector("#sourceToRemoveInput").value;
+            postRequest('/removeTrivia', {source: triviaSource});
+            document.querySelector("#removeTriviaStatus").innerHTML = "Submitted";
+          });    
+        }
+      };
+
+      suggestedTriviaTab.addEventListener('click', selectTab);
+      problemReportTab.addEventListener('click', selectTab);
+      triviaChangeTab.addEventListener('click', selectTab)
+    }
+
+    window.onload = init;
   </script>
 </head>
 
 <body>
-  <h1>Admin Page</h1>
-  <br>
-  <br>
-  <p>TO DO: Display problem reports</p>
-  <p>TO DO: Display trivia suggestions</p>
-  <p>TO DO: Delete Trivia Form</p>
-  <p>TO DO: Add Trivia Form</p>
+  <section id="top">
+    <h1>Admin Page</h1>
+    <br>
+    <br>
+    <div id="navContainer">
+      <ul id="navList">
+        <li id="suggestedTriviaTab">Suggested Trivia</li>
+        <li id="problemReportTab">Problem Reports</li>
+        <li id="triviaChangeTab">Change Trivia</li>
+      </ul>
+    </div>
+  </section>
+  <section id="content">
+  </section>
 </body>
 
 </html>
